@@ -3,12 +3,14 @@ package com.vito.touchtojoystick.service
 import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.PixelFormat
+import android.os.Handler
 import android.os.SystemClock
 import android.util.Log
 import android.view.*
 import androidx.cardview.widget.CardView
 import com.vito.touchtojoystick.R
 import com.vito.touchtojoystick.TouchOverlayFrameLayout
+import kotlin.math.roundToInt
 
 @SuppressLint("ClickableViewAccessibility")
 class Window(
@@ -21,7 +23,12 @@ class Window(
     private val mWindowManager: WindowManager
     private val layoutInflater: LayoutInflater
     var lastDirection: TouchDirection = TouchDirection.c
+    var str = 100
+    val handler = Handler()
+    var tapX: Float? = null
+    var tapY: Float? = null
 
+    val debounceTime = 300
     init {
         // set the layout parameters of the window
         mParams = WindowManager.LayoutParams(
@@ -38,7 +45,6 @@ class Window(
 
         clickArea = layoutInflater.inflate(R.layout.click_area, null) as TouchOverlayFrameLayout
         var lastClickTime: Long = 0
-        val debounceTime = 500
         clickArea.setOnTouchListener { v, event ->
             if (SystemClock.elapsedRealtime() - lastClickTime < debounceTime) return@setOnTouchListener true
             val coordinates = IntArray(2)
@@ -47,7 +53,11 @@ class Window(
             val y = coordinates[1] + event.y
 
             Log.d("TEST", "Auto-clicking $x,$y")
-            AutoClickService.instance?.click(x.toInt(), y.toInt())
+            tapX?.toInt()
+                ?.let {
+                    tapY?.toInt()
+                        ?.let { it1 -> AutoClickService.instance?.click(x.toInt(), y.toInt(), it, it1) }
+                }
             lastClickTime = SystemClock.elapsedRealtime()
             true
         }
@@ -73,6 +83,8 @@ class Window(
             r,
         )
         mView.setOnTouchListener { v, event ->
+            tapX = event.rawX
+            tapY = event.rawY
             if (event.action == MotionEvent.ACTION_DOWN || event.action == MotionEvent.ACTION_MOVE) {
                 val x = event.x
                 val y = v.height - event.y
@@ -80,15 +92,13 @@ class Window(
                 val lowerLimitY = v.height * 0.087
                 val xSide = v.width * 0.824 / 3
                 val ySide = v.height * 0.824 / 3
+                str = (event.pressure * 100).roundToInt()
 
                 if (x > lowerLimitX && x < lowerLimitX + xSide) {
                     if (y > lowerLimitY && y < lowerLimitY + ySide) {
                         lastDirection = TouchDirection.bl
-                        touchDownLeft(100)
                     } else if (y > lowerLimitY + ySide && y < lowerLimitY + ySide * 2) {
                         lastDirection = TouchDirection.l
-                        event.pressure
-                        touchLeft(100)
                     } else if (y > lowerLimitY + ySide * 2 && y < lowerLimitY + ySide * 3) {
                         lastDirection = TouchDirection.tl
                     }
@@ -108,10 +118,12 @@ class Window(
                     } else if (y > lowerLimitY + ySide * 2 && y < lowerLimitY + ySide * 3) {
                         lastDirection = TouchDirection.tr
                     }
+                } else {
+                    lastDirection = TouchDirection.c
                 }
             }
             if (event.action == MotionEvent.ACTION_UP || event.action == MotionEvent.ACTION_CANCEL) {
-                lastDirection = TouchDirection.c
+                Log.d("TEST", "Touch ACTION_CANCEL or action_up ended ${event.action}")
             }
             buttons.forEach {
                 it.alpha = 0.5f
@@ -136,7 +148,7 @@ class Window(
         mWindowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
     }
 
-    private fun touchUp(str: Int) {
+    private fun t(str: Int) {
         val parent = clickArea
         val downTime = SystemClock.uptimeMillis()
         val eventTime = SystemClock.uptimeMillis() + 100
@@ -156,7 +168,7 @@ class Window(
         parent.dispatchTouchEvent(motionEvent)
     }
 
-    private fun touchUpRight(str: Int) {
+    private fun tr(str: Int) {
         val parent = clickArea
         val downTime = SystemClock.uptimeMillis()
         val eventTime = SystemClock.uptimeMillis() + 100
@@ -176,7 +188,7 @@ class Window(
         parent.dispatchTouchEvent(motionEvent)
     }
 
-    private fun touchRight(str: Int) {
+    private fun r(str: Int) {
         val parent = clickArea
         val downTime = SystemClock.uptimeMillis()
         val eventTime = SystemClock.uptimeMillis() + 100
@@ -196,7 +208,7 @@ class Window(
         parent.dispatchTouchEvent(motionEvent)
     }
 
-    private fun touchDownRight(str: Int) {
+    private fun br(str: Int) {
         val parent = clickArea
         val downTime = SystemClock.uptimeMillis()
         val eventTime = SystemClock.uptimeMillis() + 100
@@ -216,7 +228,7 @@ class Window(
         parent.dispatchTouchEvent(motionEvent)
     }
 
-    private fun touchDown(str: Int) {
+    private fun b(str: Int) {
         val parent = clickArea
         val downTime = SystemClock.uptimeMillis()
         val eventTime = SystemClock.uptimeMillis() + 100
@@ -236,7 +248,7 @@ class Window(
         parent.dispatchTouchEvent(motionEvent)
     }
 
-    private fun touchDownLeft(str: Int) {
+    private fun bl(str: Int) {
         val parent = clickArea
         val downTime = SystemClock.uptimeMillis()
         val eventTime = SystemClock.uptimeMillis() + 100
@@ -256,7 +268,7 @@ class Window(
         parent.dispatchTouchEvent(motionEvent)
     }
 
-    private fun touchLeft(str: Int) {
+    private fun l(str: Int) {
         val parent = clickArea
         val downTime = SystemClock.uptimeMillis()
         val eventTime = SystemClock.uptimeMillis() + 100
@@ -276,7 +288,7 @@ class Window(
         parent.dispatchTouchEvent(motionEvent)
     }
 
-    private fun touchUpLeft(str: Int) {
+    private fun tl(str: Int) {
         val parent = clickArea
         val downTime = SystemClock.uptimeMillis()
         val eventTime = SystemClock.uptimeMillis() + 100
@@ -321,11 +333,35 @@ class Window(
                     params.width = r
                     params.height = r
                     mWindowManager.addView(clickArea, params)
+
+                    autoClick()
                 }
             }
         } catch (e: Exception) {
             Log.d("Error1", e.toString())
         }
+    }
+
+    private fun autoClick() {
+        if (lastDirection != TouchDirection.c) {
+            Log.d("TEST", "Auto-clicking...$lastDirection")
+        }
+        handler.postDelayed({
+            when (lastDirection) {
+                TouchDirection.t -> t(str)
+                TouchDirection.tr -> tr(str)
+                TouchDirection.r -> r(str)
+                TouchDirection.br -> br(str)
+                TouchDirection.b -> b(str)
+                TouchDirection.bl -> bl(str)
+                TouchDirection.l -> l(str)
+                TouchDirection.tl -> tl(str)
+                else -> {
+                    // nothing to do. center
+                }
+            }
+            autoClick()
+        }, debounceTime.toLong())
     }
 
     fun close() {

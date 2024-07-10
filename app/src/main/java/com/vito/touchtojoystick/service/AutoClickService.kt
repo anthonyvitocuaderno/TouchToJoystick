@@ -30,7 +30,12 @@ class AutoClickService : AccessibilityService() {
         )
     }
 
-    fun click(x: Int, y: Int) {
+    fun click(x: Int, y: Int, originX: Int, originY: Int) {
+        dispatch(x, y)
+//        dispatch(originX, originY)
+    }
+
+    fun dispatch(x: Int, y: Int) {
         val path = Path()
         path.moveTo(x.toFloat(), y.toFloat())
         val builder = GestureDescription.Builder()
