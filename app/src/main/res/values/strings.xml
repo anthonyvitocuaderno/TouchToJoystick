@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">TouchToJoystick</string>
+    <string name="accessibility_service_description">Allow simulating clicks using joystick</string>
+    <string name="accessibility_service_id">com.vito.touchtojoystick/.service.AutoClickService</string>
+    <string name="accessibility_service_name">AutoClickService</string>
+
+</resources>
